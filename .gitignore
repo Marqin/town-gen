@@ -22,3 +22,7 @@ _testmain.go
 *.exe
 *.test
 *.prof
+
+# project-specific files
+/town-gen
+/town-gen.png
