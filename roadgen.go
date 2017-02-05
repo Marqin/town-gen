@@ -25,17 +25,14 @@ import (
 	"time"
 )
 
-func genRoads(mapRect *image.Rectangle) []Road {
-
-	mapCenter := image.Pt(mapRect.Min.X+mapRect.Size().X/2, mapRect.Min.Y+mapRect.Size().Y/2)
+func genRoads(mapRect *image.Rectangle, forbiddenAreas []image.Rectangle, startingRoad Road) []Road {
 
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	road := roadWithMetadata{0, Road{mapCenter, 10, 0, 3}}
-
-	pq := make(priorityQueue, 1)
-	pq[0] = &item{value: road, priority: 0, index: 0}
+	pq := make(priorityQueue, 0)
 	heap.Init(&pq)
+
+	heap.Push(&pq, &item{value: roadWithMetadata{0, startingRoad}, priority: 0})
 
 	segments := make([]Road, 0)
 
@@ -43,11 +40,11 @@ func genRoads(mapRect *image.Rectangle) []Road {
 
 		road := heap.Pop(&pq).(*item).value
 
-		roadSegment, err := localConstraints(segments, road.data, mapRect)
+		roadSegment, err := localConstraints(segments, road.data, mapRect, forbiddenAreas)
 
 		if err == nil {
 			segments = append(segments, roadSegment)
-			newRoads := genNewRoads(road, mapCenter)
+			newRoads := genNewRoads(road, startingRoad.start)
 			for _, r := range newRoads {
 				heap.Push(&pq, &item{value: r, priority: r.branchDelay})
 			}
@@ -58,38 +55,68 @@ func genRoads(mapRect *image.Rectangle) []Road {
 	return segments
 }
 
-func localConstraints(segments []Road, d Road, mapRect *image.Rectangle) (Road, error) {
+func roadStartOK(r Road, mapRect *image.Rectangle, forbiddenAreas []image.Rectangle) bool {
 
-	if !d.start.In(*mapRect) {
-		return d, errors.New("road not starting on map")
+	if !r.start.In(*mapRect) {
+		return false
 	}
 
-	for !d.roadEnd().In(*mapRect) {
-		if d.length <= 10 {
-			return d, errors.New("road not ending on map")
+	for _, area := range forbiddenAreas {
+		if r.start.In(area) {
+			return false
 		}
-		d.length -= 10
+	}
+
+	return true
+}
+
+func roadEndOK(r Road, mapRect *image.Rectangle, forbiddenAreas []image.Rectangle) bool {
+
+	if !r.roadEnd().In(*mapRect) {
+		return false
+	}
+
+	for _, area := range forbiddenAreas {
+		if r.roadEnd().In(area) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func localConstraints(segments []Road, r Road, mapRect *image.Rectangle, forbiddenAreas []image.Rectangle) (Road, error) {
+
+	if !roadStartOK(r, mapRect, forbiddenAreas) {
+		return r, errors.New("road not starting on map")
+	}
+
+	for !roadEndOK(r, mapRect, forbiddenAreas) {
+		if r.length <= 10 {
+			return r, errors.New("road not ending on map")
+		}
+		r.length -= 10
 	}
 
 	// check for overlaping with other roads
 
 	for _, otherRoad := range segments {
-		if d.isHorizontal() == otherRoad.isHorizontal() {
-			if d.getRect().Overlaps(otherRoad.getRect()) {
-				return d, errors.New("road overlaps with another road")
+		if r.isHorizontal() == otherRoad.isHorizontal() {
+			if r.getRect().Overlaps(otherRoad.getRect()) {
+				return r, errors.New("road overlaps with another road")
 			}
 		}
 	}
 
-	return d, nil
+	return r, nil
 }
 
-func genNewRoads(r roadWithMetadata, mapCenter image.Point) []roadWithMetadata {
+func genNewRoads(r roadWithMetadata, townCenter image.Point) []roadWithMetadata {
 	roads := make([]roadWithMetadata, 0)
 
 	branchDelay := r.branchDelay + 1
 
-	densityVector := r.data.roadEnd().Sub(mapCenter)
+	densityVector := r.data.roadEnd().Sub(townCenter)
 	density := int(math.Sqrt(float64(densityVector.X*densityVector.X + densityVector.Y*densityVector.Y)))
 
 	if density < 50 {
