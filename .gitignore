@@ -26,3 +26,8 @@ _testmain.go
 # project-specific files
 /town-gen
 /town-gen.png
+
+Cities.json
+
+towns
+*png
