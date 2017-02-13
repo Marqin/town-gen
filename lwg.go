@@ -38,7 +38,7 @@ const (
 
 type lwgTown struct {
 	Name         string `json:"name"`
-	HasRiver     string `json:"isThereRiver"`
+	HasRiver     bool   `json:"isThereRiver"`
 	WaterOnNorth bool   `json:"waterOnTop"`
 	WaterOnEast  bool   `json:"waterOnRight"`
 	WaterOnSouth bool   `json:"waterOnBottom"`
@@ -108,6 +108,19 @@ func drawLWGTown(dir string, town lwgTown) error {
 		water := image.Rect(0, 0, waterSize, height)
 		forbiddenAreas = append(forbiddenAreas, water)
 		drawRect(gc, water)
+	}
+
+	if town.HasRiver {
+		riverWidth := rand.Intn(20) + margin
+
+		riverMarginV := 2*margin + rand.Intn(width-4*margin)
+		riverMarginH := 2*margin + rand.Intn(height-4*margin)
+		switch rnd := rand.Intn(1); rnd {
+		case 0: // vertical
+			drawRect(gc, image.Rect(riverMarginV, 0, riverMarginV+riverWidth, height))
+		case 1: // horizontal
+			drawRect(gc, image.Rect(0, riverMarginH, width, riverMarginH+riverWidth))
+		}
 	}
 
 	startingRoad := Road{
